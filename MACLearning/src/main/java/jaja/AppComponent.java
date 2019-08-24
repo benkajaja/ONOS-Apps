@@ -88,8 +88,6 @@ public class AppComponent {
         appId = coreService.registerApplication("org.jaja.maclearning");
         packetService.addProcessor(processor, PacketProcessor.director(0));
         
-        /** Be careful with this command.
-            This flow cannot be canceled even if the application is deactivated*/ 
         packetService.requestPackets(DefaultTrafficSelector.builder()
                                     .matchEthType(Ethernet.TYPE_IPV4).build(), 
                                     PacketPriority.REACTIVE, 
@@ -109,6 +107,11 @@ public class AppComponent {
         flowRuleService.removeFlowRulesById(appId);
         packetService.removeProcessor(processor);
         processor = null;
+        
+        packetService.cancelPackets(DefaultTrafficSelector.builder()
+                                    .matchEthType(Ethernet.TYPE_IPV4).build(), 
+                                    PacketPriority.REACTIVE, 
+                                    appId);
         log.info("Get Out");
     }
 
