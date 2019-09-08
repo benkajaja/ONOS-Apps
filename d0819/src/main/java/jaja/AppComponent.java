@@ -125,6 +125,9 @@ public class AppComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected AppService appservice;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected OVSPipelineService ovspipelineService;
+
     @Activate
     protected void activate() {
         // cfgService.registerProperties(getClass());
@@ -134,6 +137,8 @@ public class AppComponent {
         appservice.initializeAppService(log, deviceService, linkService, topologyService);
         appservice.initializeStatsTask();
         appservice.startTask();
+
+        ovspipelineService.initializeService(appId);
 
         requestIntercepts();
 
