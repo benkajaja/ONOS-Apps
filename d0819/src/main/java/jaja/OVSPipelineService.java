@@ -20,7 +20,7 @@ public interface OVSPipelineService {
 
     void setRule();
 
-    void setUpTableMissEntry(Device device, int table);
+    void setUpTableMissEntry(Device device, int table, int op);
 
     void connectTables(Device device, int fromTable, int toTable);
 

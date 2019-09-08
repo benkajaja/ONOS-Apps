@@ -40,6 +40,8 @@ public class OVSPipelineServiceImpl implements OVSPipelineService {
     private final Logger log = LoggerFactory.getLogger("jaja.AppComponent");
     private static final int DEFAULT_PRIORITY = 10;
     private static final int DEFAULT_DURATION = 20;
+    private static final int DROP = 0;
+    private static final int CONTROLLER = 1;
     
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected CoreService coreService;
@@ -64,11 +66,12 @@ public class OVSPipelineServiceImpl implements OVSPipelineService {
     public void initializePipeline(Device device) {
         log.info("test log");
         connectTables(device, L4STATS_TABLE, L3FWD_TABLE);
+        setRequestFlow(device);
         // setStatsTables(device, Set.of(56,8787));
         setStatsTpPorts(device, Stream.of(56,8787).collect(Collectors.toSet()));
         setStatsTpPort(device, 9696);
-        setUpTableMissEntry(device, L3FWD_TABLE);
-        setUpTableMissEntry(device, ENTRY_TABLE);
+        setUpTableMissEntry(device, L3FWD_TABLE, CONTROLLER);
+        setUpTableMissEntry(device, ENTRY_TABLE, DROP);
     }
 
     @Override
@@ -87,11 +90,12 @@ public class OVSPipelineServiceImpl implements OVSPipelineService {
     }
 
     @Override
-    public void setUpTableMissEntry(Device device, int table){
+    public void setUpTableMissEntry(Device device, int table, int op){
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
 
-        treatment.drop();
+        if (op == DROP) treatment.drop();
+        else if (op == CONTROLLER) treatment.punt();
 
         FlowRule flowRule = DefaultFlowRule.builder()
                 .forDevice(device.id())

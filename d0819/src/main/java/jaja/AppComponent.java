@@ -49,6 +49,8 @@ import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.FlowRule;
+import org.onosproject.net.flow.FlowRuleOperations;
+import org.onosproject.net.flow.FlowRuleOperationsContext;
 import org.onosproject.net.flow.FlowRuleService;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
@@ -94,6 +96,10 @@ public class AppComponent {
     private DeviceListener deviceListener = new InternalDeviceListener();
     private static final int DEFAULT_PRIORITY = 10;
     private static final int DEFAULT_DURATION = 20;
+    private static final int ENTRY_TABLE = 0;
+    private static final int L3FWD_TABLE = 2;
+    private static final int L4STATS_TABLE = 1;
+    private static final int TABLE_MISS_PRIORITY = 0;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected CoreService coreService;
@@ -140,13 +146,13 @@ public class AppComponent {
 
         ovspipelineService.initializeService(appId);
 
-        requestIntercepts();
+        // requestIntercepts();
 
         topologyService.addListener(topologyListener);
         deviceService.addListener(deviceListener);
 
         weigherTest();
-        multiTableTest();
+        // multiTableTest();
                                     
         log.info("log name: {}", log.getName());
         log.info("appid: {} {}", appId.id(), appId.name());
@@ -156,7 +162,7 @@ public class AppComponent {
     @Deactivate
     protected void deactivate() {
         cfgService.unregisterProperties(getClass(), false);
-        withdrawIntercepts();
+        // withdrawIntercepts();
         topologyService.removeListener(topologyListener);
         deviceService.removeListener(deviceListener);
         flowRuleService.removeFlowRulesById(appId);
@@ -446,7 +452,8 @@ public class AppComponent {
             InboundPacket pkt = context.inPacket();
             Ethernet ethPkt = pkt.parsed();
             
-            TrafficSelector.Builder selectorBuilder = DefaultTrafficSelector.builder();
+            TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
 
             if (ethPkt.getEtherType() == Ethernet.TYPE_ARP) {
                 log.info("[DEBUG] Directly pass arp packet to {}", outport);
@@ -458,29 +465,39 @@ public class AppComponent {
 
             IPv4 p = (IPv4) ethPkt.getPayload();
 
-            selectorBuilder//.matchInPort(pkt.receivedFrom().port())
+            selector//.matchInPort(pkt.receivedFrom().port())
                     // .matchEthSrc(ethPkt.getSourceMAC())
                     // .matchEthDst(ethPkt.getDestinationMAC())
                     // .matchIPSrc(IpPrefix.valueOf(p.getSourceAddress(), IpPrefix.MAX_INET_MASK_LENGTH))
                     .matchEthType(Ethernet.TYPE_IPV4)
                     .matchIPDst(IpPrefix.valueOf(p.getDestinationAddress(), IpPrefix.MAX_INET_MASK_LENGTH))
-                    
                     ;
 
-            TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                    .setOutput(outport)
-                    .build();
+            
+            treatment.setOutput(outport);
 
-            ForwardingObjective forwardingObjective = DefaultForwardingObjective.builder()
-                    .withSelector(selectorBuilder.build())
-                    .withTreatment(treatment)
-                    .withPriority(DEFAULT_PRIORITY)
-                    .withFlag(ForwardingObjective.Flag.VERSATILE)
-                    .fromApp(appId)
-                    .makeTemporary(DEFAULT_DURATION)
-                    .add();
+            FlowRule flowRule = DefaultFlowRule.builder()
+                .forDevice(pkt.receivedFrom().deviceId())
+                .withSelector(selector.build())
+                .withTreatment(treatment.build())
+                .withPriority(DEFAULT_PRIORITY)
+                .fromApp(appId)
+                .makePermanent()
+                .forTable(L3FWD_TABLE)
+                .build();
 
-            flowObjectiveService.forward(pkt.receivedFrom().deviceId(), forwardingObjective);
+            applyRule(flowRule, true);
+            
+            // ForwardingObjective forwardingObjective = DefaultForwardingObjective.builder()
+            //         .withSelector(selectorBuilder.build())
+            //         .withTreatment(treatment)
+            //         .withPriority(DEFAULT_PRIORITY)
+            //         .withFlag(ForwardingObjective.Flag.VERSATILE)
+            //         .fromApp(appId)
+            //         .makeTemporary(DEFAULT_DURATION)
+            //         .add();
+
+            // flowObjectiveService.forward(pkt.receivedFrom().deviceId(), forwardingObjective);
 
             log.info("[ADD RULE]  DeviceID {} Match {} OutPort {}", 
                         pkt.receivedFrom().deviceId(), 
@@ -494,6 +511,24 @@ public class AppComponent {
             );*/
         }
 
+        private void applyRule(FlowRule flowRule, boolean install) {
+            FlowRuleOperations.Builder flowOpsBuilder = FlowRuleOperations.builder();
+    
+            flowOpsBuilder = install ? flowOpsBuilder.add(flowRule) : flowOpsBuilder.remove(flowRule);
+    
+            flowRuleService.apply(flowOpsBuilder.build(new FlowRuleOperationsContext() {
+                @Override
+                public void onSuccess(FlowRuleOperations ops) {
+                    log.debug("Provisioned vni or forwarding table");
+                }
+    
+                @Override
+                public void onError(FlowRuleOperations ops) {
+                    log.debug("Failed to provision vni or forwarding table");
+                }
+            }));
+        }
+        
         /** ref
          * https://github.com/MaoJianwei/ONOS_OVS_Manager_Bootcamp2016/blob/master/ovsmanager/OVSPipeline.java
          * https://github.com/opennetworkinglab/onos-app-samples/blob/master/tvue/src/main/java/org/onosproject/tvue/TopologyResource.java
