@@ -1,5 +1,6 @@
 #sudo mn --topo mytopo --mac --custom mytopo.py --controller remote,ip=127.0.0.1 --switch ovsk,protocol=OpenFlow13
 from mininet.topo import Topo
+from mininet.link import TCLink
 
 class MyTopo(Topo):
     "Simple loop topology example."
@@ -29,11 +30,11 @@ class MyTopo(Topo):
         self.addLink(switch3, host3, 6)
         self.addLink(switch4, host4, 6)
         self.addLink(switch4, host5, 7)
-        self.addLink(switch1, switch2, 2, 1)
-        self.addLink(switch1, switch3, 3, 1)
-        self.addLink(switch1, switch4, 4, 1)
-        self.addLink(switch2, switch4, 4, 2)
-        self.addLink(switch3, switch4, 4, 3)
+        self.addLink(switch1, switch2, 2, 1, cls = TCLink, bw = 200)
+        self.addLink(switch1, switch3, 3, 1, cls = TCLink, bw = 200)
+        self.addLink(switch1, switch4, 4, 1, cls = TCLink, bw = 200)
+        self.addLink(switch2, switch4, 4, 2, cls = TCLink, bw = 200)
+        self.addLink(switch3, switch4, 4, 3, cls = TCLink, bw = 200)
 
         # self.addLink(switch1, host1, 1)
         # self.addLink(switch1, switch2, 2, 1)

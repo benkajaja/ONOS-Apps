@@ -1,7 +1,7 @@
 package jaja;
 
 // import org.onosproject.net.ConnectPoint;
-import org.onosproject.net.DeviceId;
+// import org.onosproject.net.DeviceId;
 import org.onosproject.net.Link;
 import org.onosproject.net.topology.LinkWeigher;
 import org.onosproject.net.topology.TopologyEdge;

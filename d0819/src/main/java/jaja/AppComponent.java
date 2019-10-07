@@ -134,25 +134,23 @@ public class AppComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected OVSPipelineService ovspipelineService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected StatsService statsService;
+
     @Activate
     protected void activate() {
         // cfgService.registerProperties(getClass());
         appId = coreService.registerApplication("org.jaja.d0819");
         packetService.addProcessor(processor, PacketProcessor.director(0)); 
 
-        appservice.initializeAppService(log, deviceService, linkService, topologyService);
-        appservice.initializeStatsTask();
-        appservice.startTask();
-
         ovspipelineService.initializeService(appId);
+
+        statsService.initializeService(appId);
 
         // requestIntercepts();
 
         topologyService.addListener(topologyListener);
         deviceService.addListener(deviceListener);
-
-        weigherTest();
-        // multiTableTest();
                                     
         log.info("log name: {}", log.getName());
         log.info("appid: {} {}", appId.id(), appId.name());
@@ -168,81 +166,8 @@ public class AppComponent {
         flowRuleService.removeFlowRulesById(appId);
         packetService.removeProcessor(processor);
         processor = null;
-        appservice.stopTask();
+        statsService.stopService();
         log.info("Get out!");
-    }
-
-    private void weigherTest(){
-        int cnt = 0;
-        // Host src = hostService.getHost(HostId.hostId(MacAddress.valueOf("00:00:00:00:00:01")));
-        // Host dst = hostService.getHost(HostId.hostId(MacAddress.valueOf("00:00:00:00:00:04")));
-        
-        String src = "of:0000000000000001";
-        String dst = "of:0000000000000004";
-        
-        Set<Path> paths =
-                    topologyService.getPaths(topologyService.currentTopology(),
-                                            //  src.location().deviceId(),
-                                            //  dst.location().deviceId(),
-                                            DeviceId.deviceId(src),
-                                            DeviceId.deviceId(dst),
-                                             new TopoWeigher(appservice.getCongestLinks()));
-        for (Path path: paths){
-            log.info("[Path {}]   weight:{}", cnt, path.weight());
-            for (Link link: path.links()){
-                log.info("{} -> {}", link.src(), link.dst());
-            }
-            cnt ++;
-        }
-    }
-
-    private void multiTableTest(){
-
-        String src = "of:0000000000000001";
-
-        TrafficSelector.Builder selector = DefaultTrafficSelector.builder()
-                                           .matchEthType(Ethernet.TYPE_IPV4)
-                                           .matchIPProtocol(IPv4.PROTOCOL_TCP)
-                                           .matchTcpSrc(TpPort.tpPort(8787));
-
-        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder()
-                                             .drop();
-
-
-
-        FlowRule rule = DefaultFlowRule.builder()
-                .forDevice(DeviceId.deviceId(src))
-                .withSelector(selector.build())
-                .withTreatment(treatment.build())
-                .withPriority(DEFAULT_PRIORITY)
-                .fromApp(appId)
-                .makePermanent()
-                // .makeTemporary(DEFAULT_DURATION)
-                .forTable(1)
-                .build();
-
-        flowRuleService.applyFlowRules(rule);
-
-
-        selector = DefaultTrafficSelector.builder()
-                    .matchEthType(Ethernet.TYPE_IPV4);
-
-        treatment = DefaultTrafficTreatment.builder()
-                    .transition(1);
-
-        rule = DefaultFlowRule.builder()
-                    .forDevice(DeviceId.deviceId(src))
-                    .withSelector(selector.build())
-                    .withTreatment(treatment.build())
-                    .withPriority(0)
-                    .fromApp(appId)
-                    .makePermanent()
-                    // .makeTemporary(DEFAULT_DURATION)
-                    .forTable(0)
-                    .build();
-
-        flowRuleService.applyFlowRules(rule);
-
     }
 
     /**
@@ -557,6 +482,7 @@ public class AppComponent {
          * 
          * https://github.com/opennetworkinglab/onos/blob/onos-2.0/apps/ofagent/src/main/java/org/onosproject/ofagent/impl/DefaultOFSwitch.java
          * https://wiki.onosproject.org/display/ONOS/Flow+Rule+Subsystem
+         * https://github.com/opennetworkinglab/onos/blob/master/apps/openstacknetworking/app/src/main/java/org/onosproject/openstacknetworking/cli/OpenstackConfigStatefulSnatCommand.java
          */
     }
 }

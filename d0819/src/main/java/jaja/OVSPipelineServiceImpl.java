@@ -39,9 +39,10 @@ public class OVSPipelineServiceImpl implements OVSPipelineService {
     private static final int TABLE_MISS_PRIORITY = 0;
     private final Logger log = LoggerFactory.getLogger("jaja.AppComponent");
     private static final int DEFAULT_PRIORITY = 10;
-    private static final int DEFAULT_DURATION = 20;
+    // private static final int DEFAULT_DURATION = 20;
     private static final int DROP = 0;
     private static final int CONTROLLER = 1;
+    private Set<Integer> targetPorts = Stream.of(5001,8787).collect(Collectors.toSet());
     
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected CoreService coreService;
@@ -55,37 +56,25 @@ public class OVSPipelineServiceImpl implements OVSPipelineService {
     @Override
     public void initializeService(ApplicationId appId){
         this.appId = appId;
-        // appId = coreService.getAppId("org.jaja.d0907");
-        // appId = coreService.registerApplication("org.jaja.d0907");
-
-        initializePipeline(deviceService);
+        initializePipeline();
         log.info("Initialize OVSPipelineService");
     }
 
     @Override
-    public void initializePipeline(Device device) {
-        log.info("test log");
-        connectTables(device, L4STATS_TABLE, L3FWD_TABLE);
-        setRequestFlow(device);
-        // setStatsTables(device, Set.of(56,8787));
-        setStatsTpPorts(device, Stream.of(56,8787).collect(Collectors.toSet()));
-        setStatsTpPort(device, 9696);
-        setUpTableMissEntry(device, L3FWD_TABLE, CONTROLLER);
-        setUpTableMissEntry(device, ENTRY_TABLE, DROP);
-    }
+    public void initializePipeline() {
 
-    @Override
-    public void initializePipeline(DeviceService deviceService) {
-        deviceService.getAvailableDevices().forEach(dev -> initializePipeline(dev));
-    }
+        for (Device dev: deviceService.getAvailableDevices()){
+            log.info("test log");
+            connectTables(dev, L4STATS_TABLE, L3FWD_TABLE);
+            setRequestFlow(dev);
+            // setStatsTables(dev, Set.of(56,8787));
+            // setStatsTpPorts(dev, Stream.of(5001,8787).collect(Collectors.toSet()));
+            setStatsTpPorts(dev, targetPorts);
+            setStatsTpPort(dev, 9696);
+            setUpTableMissEntry(dev, L3FWD_TABLE, CONTROLLER);
+            setUpTableMissEntry(dev, ENTRY_TABLE, DROP);
 
-    @Override
-    public void closePipeline(){
-
-    }
-
-    @Override
-    public void setRule() {
+        }
 
     }
 
@@ -131,45 +120,26 @@ public class OVSPipelineServiceImpl implements OVSPipelineService {
 
     }
 
-    @Override
-    public void setStatsTpPorts(Device device, Set<Integer> ports) {
+    
+    private void setStatsTpPorts(Device device, Set<Integer> ports) {
 
         ports.forEach(port -> {
             setStatsTpPort(device, port);
         });
-		/*ports.forEach(port -> {
-            TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-
-            selector.matchEthType(Ethernet.TYPE_IPV4)
-                    .matchIPProtocol(IPv4.PROTOCOL_TCP)
-                    .matchTcpSrc(TpPort.tpPort(port));
-            treatment.transition(L3FWD_TABLE);
-
-            FlowRule flowRule = DefaultFlowRule.builder()
-                    .forDevice(device.id())
-                    .withSelector(selector.build())
-                    .withTreatment(treatment.build())
-                    .withPriority(DEFAULT_PRIORITY)
-                    .fromApp(appId)
-                    .makePermanent()
-                    .forTable(L4STATS_TABLE)
-                    .build();
-
-            applyRule(flowRule, true);
-
-        });*/
         
     }
 
-    @Override
-    public void setStatsTpPort(Device device, int port){
+    
+    private void setStatsTpPort(Device device, int port){
+
+        setTargetPorts(port);
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
 
         selector.matchEthType(Ethernet.TYPE_IPV4)
                 .matchIPProtocol(IPv4.PROTOCOL_TCP)
-                .matchTcpSrc(TpPort.tpPort(port));
+                // .matchTcpSrc(TpPort.tpPort(port));
+                .matchTcpDst(TpPort.tpPort(port));
         treatment.transition(L3FWD_TABLE);
 
         FlowRule flowRule = DefaultFlowRule.builder()
@@ -224,6 +194,25 @@ public class OVSPipelineServiceImpl implements OVSPipelineService {
                 log.debug("Failed to provision vni or forwarding table");
             }
         }));
+    }
+
+    @Override
+    public Set<Integer> getTargetPorts() {
+        return targetPorts;
+    }
+
+    private void setTargetPorts(int port) {
+        targetPorts.add(port);
+    }
+
+    @Override
+    public void addStatsTpPort(int port){
+        deviceService.getAvailableDevices().forEach(dev -> setStatsTpPort(dev, port));
+    }
+
+    @Override
+    public void addStatsTpPorts(Set<Integer> port){
+        deviceService.getAvailableDevices().forEach(dev -> setStatsTpPorts(dev, port));
     }
 }
 

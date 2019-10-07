@@ -44,6 +44,8 @@ public class portStatsReaderTask {
     public static final short DELTA = 0;
     public static final short CUMULATIVE = 1;
     private float CONGEST_THRESHOLD_MBPS = 1000;
+    public static final short INGRESS = 0;
+    public static final short EGRESS = 1;
     
 
     class Task extends TimerTask {
@@ -71,26 +73,32 @@ public class portStatsReaderTask {
                     log.info("Port " + port + " Rate " + rate + " MB/s");
                 }
                 
-                // if (statsType == DELTA) updateStats(portdeltastat.bytesReceived(), portdeltastat.bytesSent(), portdeltastat.packetsReceived(), portdeltastat.packetsSent());
-                // else if (statsType == CUMULATIVE) updateStats(portstat.bytesReceived(), portstat.bytesSent(), portstat.packetsReceived(), portstat.packetsSent());
-
-                // updateStats(portstat.bytesReceived(), portstat.bytesSent(), portstat.packetsReceived(), portstat.packetsSent());
-                // updateStats(portdeltastat.bytesReceived(), portdeltastat.bytesSent(), portdeltastat.packetsReceived(), portdeltastat.packetsSent());
-                
                 if (statsType == DELTA) updateStats(portdeltastat);
                 else if (statsType == CUMULATIVE) updateStats(portstat);
                 updateRates(portdeltastat);
 
-                Set<Link> links = linkService.getLinks(new ConnectPoint(getDevice().id(), getPort()));
-                for (Link link : links){
-                    if (isCongest(portdeltastat)){
+                Set<Link> inlinks = linkService.getIngressLinks(new ConnectPoint(getDevice().id(), getPort()));
+                for (Link link : inlinks){
+                    if (isCongest(portdeltastat, INGRESS)){
                         log.info("[DEBUG] congest detected! {} -> {}", link.src(), link.dst());
                         if(!congestLinks.contains(link)){
                             congestLinks.add(link);
                         }
-                    } else congestLinks.remove(link);
+                    }
+                    else congestLinks.remove(link);
                 }
-                
+
+                Set<Link> elinks = linkService.getEgressLinks(new ConnectPoint(getDevice().id(), getPort()));
+                for (Link link : elinks){
+                    if (isCongest(portdeltastat, EGRESS)){
+                        log.info("[DEBUG] congest detected! {} -> {}", link.src(), link.dst());
+                        if(!congestLinks.contains(link)){
+                            congestLinks.add(link);
+                        }
+                    }
+                    else congestLinks.remove(link);
+                }
+
                 try {
                     Thread.sleep((getDelay() * 1000));
                 } catch (InterruptedException e) {
@@ -216,13 +224,19 @@ public class portStatsReaderTask {
         this.congestLinks = congestLinks;
     }
 
-    public boolean isCongest(PortStatistics ps){
+    public boolean isCongest(PortStatistics ps, short type){
         float duration = ((float) ps.durationSec()) +
                          (((float) ps.durationNano()) / TimeUnit.SECONDS.toNanos(1)); 
-        float rxRate = (float) ps.bytesReceived() * 8 / duration / (1024 * 1024);
-        float txRate = (float) ps.bytesSent() * 8 / duration / (1024 * 1024);
 
-        return ((rxRate + txRate) > CONGEST_THRESHOLD_MBPS)? true : false;
+        if (type == INGRESS){
+            float rxRate = (float) ps.bytesReceived() * 8 / duration / (1024 * 1024);
+            return (rxRate > CONGEST_THRESHOLD_MBPS)? true : false;
+        }
+        else if (type == EGRESS){
+            float txRate = (float) ps.bytesSent() * 8 / duration / (1024 * 1024);
+            return (txRate > CONGEST_THRESHOLD_MBPS)? true : false;
+        }
+        else return false;
 
     }
 
@@ -230,174 +244,3 @@ public class portStatsReaderTask {
         this.linkService = linkService;
     }
 }
-
-/**
- * copy
- */
-// package jaja;
-
-// import org.onosproject.net.Device;
-// import org.onosproject.net.PortNumber;
-// import org.onosproject.net.device.DeviceService;
-// import org.onosproject.net.device.PortStatistics;
-// import org.slf4j.Logger;
-
-// import java.util.ArrayList;
-// import java.util.Timer;
-// import java.util.TimerTask;
-
-
-
-// /**
-//  * Created by kspviswa-onos on 15/8/16.
-//  * Modified by jaja on 19/7/31.
-//  */
-// public class portStatsReaderTask {
-
-//     private long delay;
-//     private Timer timer = new Timer();
-//     private Logger log;
-//     private Device device;
-//     private boolean exit;
-//     private PortNumber port;
-//     private PortStatistics portStats;
-//     protected DeviceService deviceService;
-//     private long RxBytes;
-//     private ArrayList<Long> statsValue;
-//     // private long TxBytes;
-//     // private long RxPackets;
-//     // private long TxPackets;
-//     // private List<Long> stats = new ArrayList<>(4);
-    
-
-//     class Task extends TimerTask {
-
-//         public Device getDevice() {
-//             return device;
-//         }
-//         public DeviceService getDeviceService() {
-//             return deviceService;
-//         }
-//         public long getDelay() {
-//             return delay;
-//         }
-
-//         @Override
-//         public void run() {
-//             while (!isExit()) {                
-//                 log.info("[DeviceID] {}", getDevice().id());
-//                 PortStatistics portdeltastat = deviceService.getDeltaStatisticsForPort(getDevice().id(), getPort());
-//                 PortStatistics portstat = deviceService.getStatisticsForPort(getDevice().id(), getPort());
-//                 // unknown formula
-//                 double rate = (portdeltastat.bytesReceived() / (1024 * 1024));
-//                 log.info("Port " + port + " Received " + portstat.bytesReceived() + " bytes");
-//                 log.info("Port " + port + " Received " + portstat.packetsReceived() + " packets");
-//                 log.info("Port " + port + " Rate " + rate + " MB/s");
-//                 // RxBytes = portstat.bytesReceived();
-
-//                 updateStats(portstat.bytesReceived(), portstat.bytesSent(), portstat.packetsReceived(), portstat.packetsSent());
-
-//                 try {
-//                     Thread.sleep((getDelay() * 1000));
-//                 } catch (InterruptedException e) {
-//                     log.error("exception!");
-//                     e.printStackTrace();
-//                 }
-//             }
-//         }
-//     }
-
-//     public void schedule() {
-//         this.getTimer().schedule(new Task(), 0, 1000);
-//     }
-
-//     public Timer getTimer() {
-//         return timer;
-//     }
-
-//     public void setTimer(Timer timer) {
-//         this.timer = timer;
-//     }
-
-//     public Logger getLog() {
-//         return log;
-//     }
-
-//     public void setLog(Logger log) {
-//         this.log = log;
-//     }
-
-//     public boolean isExit() {
-//         return exit;
-//     }
-
-//     public void setExit(boolean exit) {
-//         this.exit = exit;
-//     }
-
-//     public long getDelay() {
-//         return delay;
-//     }
-
-//     public void setDelay(long delay) {
-//         this.delay = delay;
-//     }
-
-//     public PortStatistics getPortStats() {
-//         return portStats;
-//     }
-
-//     public void setPortStats(PortStatistics portStats) {
-//         this.portStats = portStats;
-//     }
-
-//     public PortNumber getPort() {
-//         return port;
-//     }
-
-//     public void setPort(PortNumber port) {
-//         this.port = port;
-//     }
-
-//     public DeviceService getDeviceService() {
-//         return deviceService;
-//     }
-
-//     public void setDeviceService(DeviceService deviceService) {
-//         this.deviceService = deviceService;
-//     }
-
-//     public Device getDevice() {
-//         return device;
-//     }
-
-//     public void setDevice(Device device) {
-//         this.device = device;
-//     }
-
-//     public void updateStats(long RxB, long TxB, long RxP, long TxP){
-//         // this.RxBytes = RxB;
-//         // this.TxBytes = TxB;
-//         // this.RxPackets = RxP;
-//         statsValue.set(0, Long.valueOf(RxB));
-//         statsValue.set(1, Long.valueOf(TxB));
-//         statsValue.set(2, Long.valueOf(RxP));
-//         statsValue.set(3, Long.valueOf(TxP));
-
-//     }
-
-//     public long getStats(){
-//         return this.RxBytes;
-//         // return this.stats;
-
-//         // this.RxBytes = RxB;
-//         // this.TxBytes = TxB;
-//         // this.RxPackets = RxP;
-//         // this.TxPackets = TxP;
-//     }
-
-//     public void setRecords(ArrayList<Long> record){
-//         this.statsValue = record;
-//         log.info("[DEBUG] B record size {}", record.size());
-//     }
-// }

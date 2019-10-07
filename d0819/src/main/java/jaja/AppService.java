@@ -14,26 +14,19 @@
  * limitations under the License.
  */
 package jaja;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import org.onlab.packet.MacAddress;
+import org.onosproject.core.Application;
 import org.onosproject.net.DeviceId;
-import org.onosproject.net.Link;
-import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
-import org.onosproject.net.device.DeviceService;
-import org.onosproject.net.link.LinkService;
-import org.onosproject.net.topology.TopologyService;
-import org.slf4j.Logger;
 
 /**
  * Skeletal ONOS application API.
  */
 public interface AppService {
 
-    void initializeAppService(Logger log, DeviceService deviceService, LinkService linkService, TopologyService TopologyService);
+    void initializeAppService(Application appId);
 
     Map<DeviceId, Map<MacAddress, PortNumber>> getMacTable();
     
@@ -41,32 +34,4 @@ public interface AppService {
 
     void initializeMacTable();
 
-    Map<DeviceId, Map<Port, portStatsReaderTask>> getStatsTask();
-
-    Map<DeviceId, Map<Port, ArrayList<Long>>> getRecord();
-
-    Map<DeviceId, Map<Port, ArrayList<Float>>> getRate();
-
-    List<Link> getCongestLinks();
-
-    void setDeviceService(DeviceService deviceService);
-
-    void setLinkService(LinkService linkService);
-
-    void setTopologyService(TopologyService topologyService);
-
-    DeviceService getDeviceService();
-
-    LinkService getLinkService();
-
-    TopologyService getTopologyService();
-    
-    void initializeStatsTask();
-
-    void startTask();
-
-    void stopTask();
-
-
-    
 }
